@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sun, Moon, Upload, FileImage, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +14,8 @@ const Index = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
+  const imageRef = useRef<HTMLImageElement>(null);
 
   // Carregar preferência de tema do localStorage
   useEffect(() => {
@@ -40,7 +42,18 @@ const Index = () => {
     const file = event.target.files?.[0];
     if (file) {
       setFileName(file.name);
-      setImage(URL.createObjectURL(file));
+      
+      // Get original image dimensions before setting the image URL
+      const img = new Image();
+      img.onload = () => {
+        setOriginalImageSize({ width: img.width, height: img.height });
+        URL.revokeObjectURL(img.src); // Clean up
+      };
+      
+      const imageUrl = URL.createObjectURL(file);
+      img.src = imageUrl;
+      setImage(imageUrl);
+      
       sendImageToBackend(file);
     }
   };
@@ -70,6 +83,21 @@ const Index = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Calculate scale factors based on displayed image size
+  const getScaleFactors = () => {
+    if (!imageRef.current || originalImageSize.width === 0) {
+      return { scaleX: 1, scaleY: 1 };
+    }
+    
+    const displayedWidth = imageRef.current.clientWidth;
+    const displayedHeight = imageRef.current.clientHeight;
+    
+    return {
+      scaleX: displayedWidth / originalImageSize.width,
+      scaleY: displayedHeight / originalImageSize.height
+    };
   };
 
   // Overlay for mobile when sidebar is open
@@ -179,9 +207,14 @@ const Index = () => {
                   <Separator className="mb-4" />
                   <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative">
                     <img 
+                      ref={imageRef}
                       src={image} 
                       alt="Com detecções" 
                       className="w-full h-auto object-contain"
+                      onLoad={() => {
+                        // Force a re-render so we get accurate image dimensions after loading
+                        setDetections([...detections]);
+                      }}
                     />
                     
                     {isLoading ? (
@@ -192,30 +225,34 @@ const Index = () => {
                         </div>
                       </div>
                     ) : (
-                      detections.map((box, index) => (
-                        <div
-                          key={index}
-                          className="absolute border-4 border-red-500 rounded-lg shadow-md"
-                          style={{
-                            left: `${box.x1}px`,
-                            top: `${box.y1}px`,
-                            width: `${box.x2 - box.x1}px`,
-                            height: `${box.y2 - box.y1}px`,
-                          }}
-                        >
+                      detections.map((box, index) => {
+                        const { scaleX, scaleY } = getScaleFactors();
+                        
+                        return (
                           <div
-                            className="absolute bg-red-600 text-white text-sm font-semibold px-2 py-1 rounded-lg shadow-md"
+                            key={index}
+                            className="absolute border-4 border-red-500 rounded-lg shadow-md"
                             style={{
-                              top: "-28px",
-                              left: "50%",
-                              transform: "translateX(-50%)",
-                              whiteSpace: "nowrap",
+                              left: `${box.x1 * scaleX}px`,
+                              top: `${box.y1 * scaleY}px`,
+                              width: `${(box.x2 - box.x1) * scaleX}px`,
+                              height: `${(box.y2 - box.y1) * scaleY}px`,
                             }}
                           >
-                            {box.label} ({box.confidence}%)
+                            <div
+                              className="absolute bg-red-600 text-white text-xs md:text-sm font-semibold px-2 py-1 rounded-lg shadow-md"
+                              style={{
+                                top: "-28px",
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {box.label}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </CardContent>
