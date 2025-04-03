@@ -49,9 +49,10 @@ const menuItems = [
 interface SidebarProps {
   isMobileOpen: boolean;
   toggleMobileSidebar: () => void;
+  darkMode: boolean;
 }
 
-const Sidebar = ({ isMobileOpen, toggleMobileSidebar }: SidebarProps) => {
+const Sidebar = ({ isMobileOpen, toggleMobileSidebar, darkMode }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeItem, setActiveItem] = useState(location.pathname);
@@ -67,14 +68,20 @@ const Sidebar = ({ isMobileOpen, toggleMobileSidebar }: SidebarProps) => {
   return (
     <div
       className={cn(
-        "fixed top-0 left-0 z-40 h-full w-64 transform transition-transform duration-300 ease-in-out bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col",
-        isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        "fixed top-0 left-0 z-40 h-full w-64 transform transition-transform duration-300 ease-in-out border-r flex flex-col",
+        isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+        darkMode 
+          ? "bg-gray-800 border-gray-700 text-white" 
+          : "bg-white border-gray-200 text-gray-900"
       )}
     >
       {/* Logo e Título */}
-      <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+      <div className={cn(
+        "flex items-center justify-between p-4 border-b",
+        darkMode ? "border-gray-700" : "border-gray-200"
+      )}>
         <div className="flex items-center gap-2">
-          <Brain className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+          <Brain className={cn("h-8 w-8", darkMode ? "text-blue-400" : "text-blue-600")} />
           <h2 className="text-lg font-bold">TumorVision</h2>
         </div>
         <Button 
@@ -97,8 +104,12 @@ const Sidebar = ({ isMobileOpen, toggleMobileSidebar }: SidebarProps) => {
                 className={cn(
                   "w-full justify-start gap-3 px-3 py-2 text-sm",
                   activeItem === item.path
-                    ? "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200"
-                    : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                    ? darkMode
+                      ? "bg-blue-900/40 text-blue-200"
+                      : "bg-blue-100 text-blue-800"
+                    : darkMode
+                      ? "hover:bg-gray-700"
+                      : "hover:bg-gray-100"
                 )}
                 onClick={() => handleNavigation(item.path)}
               >
@@ -111,14 +122,20 @@ const Sidebar = ({ isMobileOpen, toggleMobileSidebar }: SidebarProps) => {
       </nav>
 
       {/* Rodapé */}
-      <div className="p-4 border-t dark:border-gray-700">
+      <div className={cn(
+        "p-4 border-t",
+        darkMode ? "border-gray-700" : "border-gray-200"
+      )}>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
             N
           </div>
           <div className="text-sm">
             <p className="font-medium">Dr. Neurologista</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Médico</p>
+            <p className={cn(
+              "text-xs",
+              darkMode ? "text-gray-400" : "text-gray-500"
+            )}>Médico</p>
           </div>
         </div>
       </div>

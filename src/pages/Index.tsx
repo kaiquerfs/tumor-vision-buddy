@@ -117,6 +117,7 @@ const Index = () => {
       <Sidebar 
         isMobileOpen={isMobileSidebarOpen}
         toggleMobileSidebar={toggleMobileSidebar}
+        darkMode={darkMode}
       />
       <SidebarOverlay />
       
