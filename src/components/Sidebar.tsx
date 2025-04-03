@@ -60,6 +60,7 @@ const Sidebar = ({ isMobileOpen, toggleMobileSidebar, darkMode }: SidebarProps) 
   const handleNavigation = (path: string) => {
     setActiveItem(path);
     navigate(path);
+    // Only close the sidebar on mobile devices
     if (window.innerWidth < 768) {
       toggleMobileSidebar();
     }
