@@ -1,10 +1,10 @@
-
 import { useState, useEffect, useRef } from "react";
 import { FileImage, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { useHistory } from "@/contexts/HistoryContext";
 
 const Analise = () => {
   const [image, setImage] = useState<string | null>(null);
@@ -13,6 +13,7 @@ const Analise = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
+  const { addToHistory } = useHistory();
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -52,7 +53,16 @@ const Analise = () => {
 
       const data = await response.json();
       setDetections(data.detections);
-      toast.success("Análise concluída com sucesso");
+      
+      // Save to history after successful analysis
+      if (image) {
+        addToHistory({
+          imageUrl: image,
+          fileName: fileName,
+          detections: data.detections,
+        });
+        toast.success("Análise concluída e salva no histórico");
+      }
     } catch (error) {
       console.error("Erro ao enviar imagem:", error);
       toast.error("Erro ao processar a imagem. Verifique se o servidor está online.");

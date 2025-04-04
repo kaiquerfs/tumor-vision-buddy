@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sun, Moon, Upload, FileImage, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import Sidebar from "@/components/Sidebar";
+import { useHistory } from "@/contexts/HistoryContext";
 
 const Index = () => {
   const [image, setImage] = useState<string | null>(null);
@@ -16,6 +16,7 @@ const Index = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
+  const { addToHistory } = useHistory();
 
   // Carregar preferência de tema do localStorage
   useEffect(() => {
@@ -76,7 +77,16 @@ const Index = () => {
 
       const data = await response.json();
       setDetections(data.detections);
-      toast.success("Análise concluída com sucesso");
+      
+      // Save to history after successful analysis
+      if (image) {
+        addToHistory({
+          imageUrl: image,
+          fileName: fileName,
+          detections: data.detections,
+        });
+        toast.success("Análise concluída e salva no histórico");
+      }
     } catch (error) {
       console.error("Erro ao enviar imagem:", error);
       toast.error("Erro ao processar a imagem. Verifique se o servidor está online.");
