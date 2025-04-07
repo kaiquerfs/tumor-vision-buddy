@@ -1,10 +1,11 @@
-
 import { useState, useEffect, useRef } from "react";
 import { FileImage, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { useHistory } from "@/contexts/HistoryContext";
+import html2canvas from "html2canvas";
 
 const Analise = () => {
   const [image, setImage] = useState<string | null>(null);
@@ -13,24 +14,41 @@ const Analise = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
+  const detectionsRef = useRef<HTMLDivElement>(null);
+  const { addToHistory } = useHistory();
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setFileName(file.name);
-      
-      // Get original image dimensions
-      const img = new Image();
-      img.onload = () => {
-        setOriginalImageSize({ width: img.width, height: img.height });
-        URL.revokeObjectURL(img.src);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Image = reader.result as string;
+        setImage(base64Image);
+
+        const img = new Image();
+        img.onload = () => {
+          setOriginalImageSize({ width: img.width, height: img.height });
+        };
+        img.src = base64Image;
+
+        sendImageToBackend(file);
       };
-      
-      const imageUrl = URL.createObjectURL(file);
-      img.src = imageUrl;
-      setImage(imageUrl);
-      
-      sendImageToBackend(file);
+
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const captureImageWithDetections = async () => {
+    if (!detectionsRef.current) return null;
+
+    try {
+      const canvas = await html2canvas(detectionsRef.current);
+      return canvas.toDataURL("image/png");
+    } catch (error) {
+      console.error("Error capturing image with detections:", error);
+      return null;
     }
   };
 
@@ -52,27 +70,53 @@ const Analise = () => {
 
       const data = await response.json();
       setDetections(data.detections);
-      toast.success("Análise concluída com sucesso");
     } catch (error) {
       console.error("Erro ao enviar imagem:", error);
       toast.error("Erro ao processar a imagem. Verifique se o servidor está online.");
-    } finally {
       setIsLoading(false);
     }
   };
 
-  // Calculate scale factors based on displayed image size
+  useEffect(() => {
+    if (!detections.length || !image) return;
+  
+    // Primeiro, encerramos o loading
+    setIsLoading(false);
+  
+    const timeout = setTimeout(() => {
+      requestAnimationFrame(async () => {
+        const imageWithDetections = await captureImageWithDetections();
+  
+        if (imageWithDetections) {
+          addToHistory({
+            imageUrl: image,
+            fileName,
+            detections,
+            imageWithDetections,
+          });
+  
+          toast.success("Análise concluída e salva no histórico");
+        } else {
+          toast.error("Erro ao capturar imagem para histórico");
+        }
+      });
+    }, 200); // Pequeno delay para garantir que o overlay sumiu visualmente
+  
+    return () => clearTimeout(timeout);
+  }, [detections, image]);
+  
+
   const getScaleFactors = () => {
     if (!imageRef.current || originalImageSize.width === 0) {
       return { scaleX: 1, scaleY: 1 };
     }
-    
+
     const displayedWidth = imageRef.current.clientWidth;
     const displayedHeight = imageRef.current.clientHeight;
-    
+
     return {
       scaleX: displayedWidth / originalImageSize.width,
-      scaleY: displayedHeight / originalImageSize.height
+      scaleY: displayedHeight / originalImageSize.height,
     };
   };
 
@@ -82,64 +126,56 @@ const Analise = () => {
         <FileImage className="h-6 w-6" />
         Análise Detalhada
       </h1>
-      
+
       <Card className="mb-6">
         <CardContent className="p-6">
           <div className="flex flex-col items-center gap-4">
             <h2 className="text-xl font-semibold">Envie uma imagem para análise detalhada</h2>
-            
-            <Button onClick={() => document.getElementById('file-upload')?.click()}>
+
+            <Button onClick={() => document.getElementById("file-upload")?.click()}>
               <Upload className="mr-2 h-4 w-4" />
               Escolher Imagem
             </Button>
-            <input 
+            <input
               id="file-upload"
-              type="file" 
-              className="hidden" 
-              onChange={handleImageUpload} 
-              accept="image/*" 
+              type="file"
+              className="hidden"
+              onChange={handleImageUpload}
+              accept="image/*"
             />
-            
-            <p className="text-sm text-muted-foreground">
-              {fileName}
-            </p>
+
+            <p className="text-sm text-muted-foreground">{fileName}</p>
           </div>
         </CardContent>
       </Card>
 
       {image && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Imagem original */}
           <Card>
             <CardContent className="p-4">
               <h2 className="text-lg font-medium mb-3">Imagem Original</h2>
               <Separator className="mb-4" />
               <div className="rounded-lg overflow-hidden border">
-                <img 
-                  src={image} 
-                  alt="Original" 
-                  className="w-full h-auto object-contain"
-                />
+                <img src={image} alt="Original" className="w-full h-auto object-contain" />
               </div>
             </CardContent>
           </Card>
 
-          {/* Imagem com detecções */}
           <Card>
             <CardContent className="p-4">
               <h2 className="text-lg font-medium mb-3">Detecções e Diagnóstico</h2>
               <Separator className="mb-4" />
-              <div className="rounded-lg overflow-hidden border relative">
-                <img 
+              <div
+                ref={detectionsRef}
+                className="rounded-lg overflow-hidden border relative"
+              >
+                <img
                   ref={imageRef}
-                  src={image} 
-                  alt="Com detecções" 
+                  src={image}
+                  alt="Com detecções"
                   className="w-full h-auto object-contain"
-                  onLoad={() => {
-                    setDetections([...detections]);
-                  }}
                 />
-                
+
                 {isLoading ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm">
                     <div className="text-white text-center">
@@ -150,7 +186,7 @@ const Analise = () => {
                 ) : (
                   detections.map((box, index) => {
                     const { scaleX, scaleY } = getScaleFactors();
-                    
+
                     return (
                       <div
                         key={index}
@@ -182,7 +218,7 @@ const Analise = () => {
           </Card>
         </div>
       )}
-      
+
       {!image && (
         <div className="text-center p-10 rounded-lg bg-muted shadow-sm">
           <FileImage className="w-16 h-16 mx-auto mb-4 opacity-30" />
