@@ -1,5 +1,5 @@
 
-import { Calendar, Clock, Download, Eye, FileText } from "lucide-react";
+import { Calendar, Clock, Download, Eye, FileText, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -35,6 +35,7 @@ export const AnalysisHistoryTable = ({ history, onExportPDF, onDownloadImage }: 
         <TableRow>
           <TableHead>Imagem</TableHead>
           <TableHead>Nome do Arquivo</TableHead>
+          <TableHead>Paciente</TableHead>
           <TableHead>Data</TableHead>
           <TableHead>Detecções</TableHead>
           <TableHead className="text-right">Ações</TableHead>
@@ -54,6 +55,12 @@ export const AnalysisHistoryTable = ({ history, onExportPDF, onDownloadImage }: 
             </TableCell>
             <TableCell>
               <div className="font-medium truncate max-w-[150px]">{entry.fileName}</div>
+            </TableCell>
+            <TableCell>
+              <div className="flex items-center gap-1">
+                <User className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{entry.patientName || "Não informado"}</span>
+              </div>
             </TableCell>
             <TableCell>
               <div className="flex flex-col">

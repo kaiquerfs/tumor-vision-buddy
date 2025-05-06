@@ -17,7 +17,9 @@ export interface AnalysisEntry {
   fileName: string;
   timestamp: number;
   detections: DetectionBox[];
-  imageWithDetections?: string; // New property to store image with detections
+  imageWithDetections?: string; // Property to store image with detections
+  patientId?: string; // ID do paciente associado à análise
+  patientName?: string; // Nome do paciente para exibição
 }
 
 interface HistoryContextType {

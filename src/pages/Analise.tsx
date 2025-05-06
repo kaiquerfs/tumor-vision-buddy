@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { FileImage, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,14 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useHistory } from "@/contexts/HistoryContext";
 import html2canvas from "html2canvas";
-import { Paciente } from "@/types"; 
+
+interface Paciente {
+  id: string;
+  nome: string;
+  idade: string;
+  genero: string;
+  prontuario: string;
+}
 
 const Analise = () => {
   const [image, setImage] = useState<string | null>(null);
@@ -89,7 +97,7 @@ const Analise = () => {
   };
 
   useEffect(() => {
-    if (!detections.length || !image) return;
+    if (!detections.length || !image || !selectedPaciente) return;
   
     // Primeiro, encerramos o loading
     setIsLoading(false);
@@ -104,6 +112,8 @@ const Analise = () => {
             fileName,
             detections,
             imageWithDetections,
+            patientId: selectedPaciente.id,
+            patientName: selectedPaciente.nome
           });
   
           toast.success("Análise concluída e salva no histórico");
@@ -113,7 +123,7 @@ const Analise = () => {
       });
     }, 200); // Pequeno delay para garantir que o overlay sumiu visualmente
     return () => clearTimeout(timeout);
-  }, [detections, image]);
+  }, [detections, image, selectedPaciente]);
 
   const getScaleFactors = () => {
     if (!imageRef.current || originalImageSize.width === 0) {

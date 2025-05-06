@@ -1,5 +1,5 @@
 
-import { Eye, FileImage, Info, FileText, Download } from "lucide-react";
+import { Eye, FileImage, Info, FileText, Download, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -66,6 +66,12 @@ export const ViewAnalysisDialog = ({
                   <Separator className="mb-3" />
                   
                   <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    <div className="text-muted-foreground">Paciente:</div>
+                    <div className="flex items-center gap-1">
+                      <User className="h-3.5 w-3.5" />
+                      {entry.patientName || "Não informado"}
+                    </div>
+                    
                     <div className="text-muted-foreground">Data:</div>
                     <div>{formatDate(entry.timestamp)}</div>
                     
