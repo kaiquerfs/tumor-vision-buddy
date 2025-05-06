@@ -1,6 +1,7 @@
+
 // src/pages/Pacientes.tsx
 import { useState, useEffect } from "react";
-import { Users, PlusCircle, Pencil, Trash2 } from "lucide-react";
+import { Users, PlusCircle, Pencil, Trash2, Brain, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -20,7 +21,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { v4 as uuidv4 } from "uuid"; // Importando a função para gerar UUID
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useHistory } from "@/contexts/HistoryContext";
+import { toast } from "sonner";
+import { v4 as uuidv4 } from "uuid";
+import { PatientAnalysesList } from "@/components/PatientAnalysesList";
 
 interface Paciente {
   id: string;
@@ -38,9 +43,12 @@ const Pacientes = () => {
     genero: "",
     prontuario: "",
   });
+  const { history } = useHistory();
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string>("");
+  const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("pacientes");
 
   // Carregar pacientes do localStorage quando o componente for montado
   useEffect(() => {
@@ -88,8 +96,10 @@ const Pacientes = () => {
       setPacientes((prev) =>
         prev.map((p) => (p.id === editingId ? pacienteComId : p))
       );
+      toast.success("Paciente atualizado com sucesso");
     } else {
       setPacientes((prev) => [...prev, pacienteComId]);
+      toast.success("Paciente cadastrado com sucesso");
     }
 
     setNovoPaciente({ nome: "", idade: "", genero: "", prontuario: "" });
@@ -111,7 +121,20 @@ const Pacientes = () => {
 
   const handleRemove = (id: string) => {
     setPacientes((prev) => prev.filter((p) => p.id !== id));
+    toast.success("Paciente removido com sucesso");
   };
+
+  const viewPatientAnalyses = (patientId: string) => {
+    setSelectedPatient(patientId);
+    setActiveTab("analises");
+  };
+
+  // Contagem de análises por paciente
+  const getPatientAnalysesCount = (patientId: string) => {
+    return history.filter(analysis => analysis.patientId === patientId).length;
+  };
+
+  const selectedPatientName = pacientes.find(p => p.id === selectedPatient)?.nome;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -119,30 +142,151 @@ const Pacientes = () => {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Users className="h-6 w-6" /> Pacientes
         </h1>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button variant="default" size="sm" className="flex items-center gap-1">
-              <PlusCircle className="h-4 w-4" /> Novo Paciente
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingId !== null ? "Editar Paciente" : "Novo Paciente"}</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
+        <Button variant="default" size="sm" className="flex items-center gap-1" onClick={() => setIsOpen(true)}>
+          <PlusCircle className="h-4 w-4" /> Novo Paciente
+        </Button>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList className="w-full grid grid-cols-2 mb-4">
+          <TabsTrigger value="pacientes" onClick={() => setActiveTab("pacientes")}>
+            <Users className="h-4 w-4 mr-2" /> Lista de Pacientes
+          </TabsTrigger>
+          <TabsTrigger 
+            value="analises" 
+            onClick={() => setActiveTab("analises")} 
+            disabled={!selectedPatient}
+          >
+            <Brain className="h-4 w-4 mr-2" /> Análises do Paciente
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pacientes">
+          <Card>
+            <CardContent className="p-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Idade</TableHead>
+                    <TableHead>Gênero</TableHead>
+                    <TableHead>Prontuário</TableHead>
+                    <TableHead>Análises</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pacientes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <div className="flex flex-col items-center">
+                          <FileImage className="h-8 w-8 mb-2 text-muted-foreground/60" />
+                          <p>Nenhum paciente cadastrado</p>
+                          <Button 
+                            variant="outline" 
+                            className="mt-4" 
+                            size="sm" 
+                            onClick={() => setIsOpen(true)}
+                          >
+                            <PlusCircle className="h-4 w-4 mr-2" />
+                            Cadastrar paciente
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    pacientes.map((paciente) => (
+                      <TableRow key={paciente.id} className="hover:bg-muted/50 cursor-pointer">
+                        <TableCell className="font-medium">{paciente.nome}</TableCell>
+                        <TableCell>{paciente.idade}</TableCell>
+                        <TableCell>{paciente.genero}</TableCell>
+                        <TableCell>{paciente.prontuario}</TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="link" 
+                            onClick={() => viewPatientAnalyses(paciente.id)}
+                            className="p-0 h-auto underline text-blue-600 hover:text-blue-800"
+                          >
+                            {getPatientAnalysesCount(paciente.id)} análise(s)
+                          </Button>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEdit(paciente)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleRemove(paciente.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analises">
+          {selectedPatient && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-medium flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  Análises de {selectedPatientName}
+                </h2>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setActiveTab("pacientes")}
+                >
+                  Voltar para lista
+                </Button>
+              </div>
+              <PatientAnalysesList patientId={selectedPatient} />
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId !== null ? "Editar Paciente" : "Novo Paciente"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="nome" className="text-sm font-medium">Nome</label>
               <Input
-                placeholder="Nome"
+                id="nome"
+                placeholder="Nome completo"
                 value={novoPaciente.nome}
                 onChange={(e) => setNovoPaciente({ ...novoPaciente, nome: e.target.value })}
               />
+            </div>
+
+            <div className="grid gap-2">
+              <label htmlFor="idade" className="text-sm font-medium">Idade</label>
               <Input
+                id="idade"
                 type="number"
                 placeholder="Idade"
                 value={novoPaciente.idade}
                 onChange={(e) => setNovoPaciente({ ...novoPaciente, idade: e.target.value })}
               />
+            </div>
+
+            <div className="grid gap-2">
+              <label htmlFor="genero" className="text-sm font-medium">Gênero</label>
               <select
-                className="border rounded px-3 py-2 text-sm"
+                id="genero"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={novoPaciente.genero}
                 onChange={(e) => setNovoPaciente({ ...novoPaciente, genero: e.target.value })}
               >
@@ -150,69 +294,36 @@ const Pacientes = () => {
                 <option value="Masculino">Masculino</option>
                 <option value="Feminino">Feminino</option>
               </select>
+            </div>
+
+            <div className="grid gap-2">
+              <label htmlFor="prontuario" className="text-sm font-medium">Prontuário</label>
               <Input
-                placeholder="Prontuário"
+                id="prontuario"
+                placeholder="Número do prontuário"
                 value={novoPaciente.prontuario}
                 onChange={(e) => setNovoPaciente({ ...novoPaciente, prontuario: e.target.value })}
               />
             </div>
+          </div>
 
-            {formError && <div className="text-red-500 text-sm mt-2">{formError}</div>}
+          {formError && <div className="text-red-500 text-sm mt-2">{formError}</div>}
 
-            <DialogFooter>
-              <Button onClick={handleAddOrUpdatePaciente}>
-                {editingId !== null ? "Atualizar" : "Salvar"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Card>
-        <CardContent className="p-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Idade</TableHead>
-                <TableHead>Gênero</TableHead>
-                <TableHead>Prontuário</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pacientes.map((paciente) => (
-                <TableRow key={paciente.id}>
-                  <TableCell className="font-medium">{paciente.nome}</TableCell>
-                  <TableCell>{paciente.idade}</TableCell>
-                  <TableCell>{paciente.genero}</TableCell>
-                  <TableCell>{paciente.prontuario}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(paciente)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleRemove(paciente.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {pacientes.length === 0 && (
-        <div className="text-center text-muted-foreground mt-6">
-          Nenhum paciente cadastrado.
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsOpen(false);
+              setFormError("");
+              setNovoPaciente({ nome: "", idade: "", genero: "", prontuario: "" });
+              setEditingId(null);
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddOrUpdatePaciente}>
+              {editingId !== null ? "Atualizar" : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
