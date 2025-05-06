@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useHistory } from "@/contexts/HistoryContext";
 import html2canvas from "html2canvas";
+import { Paciente } from "@/types"; 
 
 const Analise = () => {
   const [image, setImage] = useState<string | null>(null);
@@ -13,9 +14,13 @@ const Analise = () => {
   const [fileName, setFileName] = useState("Nenhum arquivo selecionado");
   const [isLoading, setIsLoading] = useState(false);
   const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
+  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null); // Estado para o paciente selecionado
   const imageRef = useRef<HTMLImageElement>(null);
   const detectionsRef = useRef<HTMLDivElement>(null);
   const { addToHistory } = useHistory();
+  
+  // Carregar pacientes do localStorage
+  const pacientes = JSON.parse(localStorage.getItem("pacientes") || "[]");
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -53,9 +58,15 @@ const Analise = () => {
   };
 
   const sendImageToBackend = async (file: File) => {
+    if (!selectedPaciente) {
+      toast.error("Selecione um paciente antes de enviar a imagem.");
+      return;
+    }
+
     setIsLoading(true);
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("pacienteId", selectedPaciente.id);
 
     try {
       const response = await fetch("http://localhost:8000/upload/", {
@@ -101,10 +112,8 @@ const Analise = () => {
         }
       });
     }, 200); // Pequeno delay para garantir que o overlay sumiu visualmente
-  
     return () => clearTimeout(timeout);
   }, [detections, image]);
-  
 
   const getScaleFactors = () => {
     if (!imageRef.current || originalImageSize.width === 0) {
@@ -126,6 +135,29 @@ const Analise = () => {
         <FileImage className="h-6 w-6" />
         Análise Detalhada
       </h1>
+
+      {/* Selecione um paciente */}
+      <div className="mb-6">
+        <label htmlFor="paciente-select" className="block text-sm font-medium mb-2">
+          Selecione um Paciente:
+        </label>
+        <select
+          id="paciente-select"
+          className="w-full border p-2 rounded-md"
+          onChange={(e) => {
+            const pacienteId = e.target.value;
+            const paciente = pacientes.find((p: Paciente) => p.id === pacienteId);
+            setSelectedPaciente(paciente || null);
+          }}
+        >
+          <option value="">Escolha um paciente</option>
+          {pacientes.map((paciente: Paciente) => (
+            <option key={paciente.id} value={paciente.id}>
+              {paciente.nome}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <Card className="mb-6">
         <CardContent className="p-6">

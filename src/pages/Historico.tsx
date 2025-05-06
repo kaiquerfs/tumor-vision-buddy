@@ -326,6 +326,7 @@ const Historico = () => {
                                     />
                                   </div>
                                 </TabsContent>
+                          
                               </Tabs>
                               
                               <div className="flex justify-end mt-4">
@@ -333,6 +334,8 @@ const Historico = () => {
                                   <Button variant="outline">Fechar</Button>
                                 </DialogClose>
                               </div>
+
+                              
                             </DialogContent>
                           )}
                         </Dialog>
