@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { 
@@ -8,10 +7,12 @@ import {
   Settings, 
   Users, 
   Menu,
-  BarChart3
+  BarChart3,
+  User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
   { 
@@ -40,19 +41,34 @@ const menuItems = [
     path: "/estatisticas" 
   },
   { 
+    icon: User,
+    name: "Meu Perfil",
+    path: "/perfil"
+  },
+  { 
     icon: Settings, 
     name: "Configurações", 
     path: "/configuracoes" 
   },
 ];
 
+interface MedicoInfo {
+  SG_UF: string;
+  NU_CRM: string;
+  NM_MEDICO: string;
+  DT_INSCRICAO: string;
+  SITUACAO: string;
+  ESPECIALIDADE: string;
+}
+
 interface SidebarProps {
   isMobileOpen: boolean;
   toggleMobileSidebar: () => void;
   darkMode: boolean;
+  userInfo?: MedicoInfo | null;
 }
 
-const Sidebar = ({ isMobileOpen, toggleMobileSidebar, darkMode }: SidebarProps) => {
+const Sidebar = ({ isMobileOpen, toggleMobileSidebar, darkMode, userInfo }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeItem, setActiveItem] = useState(location.pathname);
@@ -64,6 +80,23 @@ const Sidebar = ({ isMobileOpen, toggleMobileSidebar, darkMode }: SidebarProps) 
     if (window.innerWidth < 768) {
       toggleMobileSidebar();
     }
+  };
+
+  // Get first name only for display
+  const displayName = userInfo?.NM_MEDICO 
+    ? userInfo.NM_MEDICO.split(' ')[0] 
+    : "Médico";
+
+  // Get specialty or default
+  const displaySpecialty = userInfo?.ESPECIALIDADE || "Profissional de Saúde";
+
+  // Get initials for avatar
+  const getInitials = () => {
+    if (!userInfo?.NM_MEDICO) return "M";
+    
+    const nameParts = userInfo.NM_MEDICO.split(' ');
+    if (nameParts.length === 1) return nameParts[0][0];
+    return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`;
   };
 
   return (
@@ -122,21 +155,36 @@ const Sidebar = ({ isMobileOpen, toggleMobileSidebar, darkMode }: SidebarProps) 
         </ul>
       </nav>
 
-      {/* Rodapé */}
+      {/* Rodapé com informações do usuário */}
       <div className={cn(
         "p-4 border-t",
         darkMode ? "border-gray-700" : "border-gray-200"
       )}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-            N
+          <div className={cn(
+            "w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold",
+            darkMode ? "bg-blue-700" : "bg-blue-600"
+          )}>
+            {getInitials()}
           </div>
-          <div className="text-sm">
-            <p className="font-medium">Dr. Neurologista</p>
-            <p className={cn(
-              "text-xs",
-              darkMode ? "text-gray-400" : "text-gray-500"
-            )}>Médico</p>
+          <div className="text-sm overflow-hidden">
+            <p className="font-medium truncate">{displayName}</p>
+            <div className="flex items-center gap-1">
+              <p className={cn(
+                "text-xs truncate max-w-[120px]",
+                darkMode ? "text-gray-400" : "text-gray-500"
+              )}>
+                {displaySpecialty}
+              </p>
+              {userInfo && (
+                <span className={cn(
+                  "text-xs px-1.5 py-0.5 rounded-full",
+                  darkMode ? "bg-green-800/50 text-green-200" : "bg-green-100 text-green-800"
+                )}>
+                  {userInfo.SG_UF}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>

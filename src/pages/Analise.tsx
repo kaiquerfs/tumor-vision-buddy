@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useHistory } from "@/contexts/HistoryContext";
+import { useAuth } from "@/contexts/AuthContext";
 import html2canvas from "html2canvas";
 
 interface Paciente {
@@ -22,10 +23,11 @@ const Analise = () => {
   const [fileName, setFileName] = useState("Nenhum arquivo selecionado");
   const [isLoading, setIsLoading] = useState(false);
   const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
-  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null); // Estado para o paciente selecionado
+  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const detectionsRef = useRef<HTMLDivElement>(null);
   const { addToHistory } = useHistory();
+  const { user, isAuthenticated } = useAuth();
   
   // Carregar pacientes do localStorage
   const pacientes = JSON.parse(localStorage.getItem("pacientes") || "[]");
@@ -71,16 +73,26 @@ const Analise = () => {
       return;
     }
 
+    if (!isAuthenticated) {
+      toast.error("Você precisa estar autenticado para realizar análises.");
+      return;
+    }
+
     setIsLoading(true);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("pacienteId", selectedPaciente.id);
 
+    const token = localStorage.getItem("token");
+
     try {
       const response = await fetch("http://localhost:8000/upload/", {
         method: "POST",
         body: formData,
-        headers: { "ngrok-skip-browser-warning": "true" },
+        headers: { 
+          "ngrok-skip-browser-warning": "true",
+          "Authorization": token ? `Bearer ${token}` : "",
+        },
       });
 
       if (!response.ok) {
@@ -113,7 +125,13 @@ const Analise = () => {
             detections,
             imageWithDetections,
             patientId: selectedPaciente.id,
-            patientName: selectedPaciente.nome
+            patientName: selectedPaciente.nome,
+            doctorInfo: user ? {
+              name: user.NM_MEDICO,
+              crm: user.NU_CRM,
+              specialty: user.ESPECIALIDADE,
+              uf: user.SG_UF
+            } : undefined
           });
   
           toast.success("Análise concluída e salva no histórico");

@@ -11,6 +11,9 @@ interface StatisticsCardProps {
   icon: LucideIcon;
   trend?: string;
   trendIncreasing?: boolean;
+  className?: string;
+  iconClassName?: string;
+  onClick?: () => void;
 }
 
 export function StatisticsCard({
@@ -20,9 +23,18 @@ export function StatisticsCard({
   icon: Icon,
   trend,
   trendIncreasing = true,
+  className,
+  iconClassName,
+  onClick,
 }: StatisticsCardProps) {
   return (
-    <Card>
+    <Card 
+      className={cn("transition-all duration-200", 
+        onClick ? "cursor-pointer hover:shadow-md" : "",
+        className
+      )}
+      onClick={onClick}
+    >
       <CardContent className="p-6">
         <div className="flex justify-between items-start">
           <div className="space-y-1">
@@ -46,8 +58,12 @@ export function StatisticsCard({
             </div>
             <p className="text-xs text-muted-foreground">{description}</p>
           </div>
-          <div className="p-2 bg-primary/10 rounded-full">
-            <Icon className="h-5 w-5 text-primary" />
+          <div className={cn("p-2 rounded-full", 
+            iconClassName || "bg-primary/10"
+          )}>
+            <Icon className={cn("h-5 w-5", 
+              iconClassName ? "text-white" : "text-primary"
+            )} />
           </div>
         </div>
       </CardContent>

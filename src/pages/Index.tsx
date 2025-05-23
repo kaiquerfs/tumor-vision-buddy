@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Upload, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useHistory } from "@/contexts/HistoryContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 
 interface IndexProps {
@@ -12,6 +15,7 @@ interface IndexProps {
 }
 
 const Index = ({ darkMode }: IndexProps) => {
+  const { isAuthenticated, user } = useAuth();
   const [image, setImage] = useState<string | null>(null);
   const [detections, setDetections] = useState<any[]>([]);
   const [fileName, setFileName] = useState("Nenhum arquivo selecionado");
@@ -20,6 +24,10 @@ const Index = ({ darkMode }: IndexProps) => {
   const imageRef = useRef<HTMLImageElement>(null);
   const detectionsRef = useRef<HTMLDivElement>(null);
   const { addToHistory } = useHistory();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -58,11 +66,16 @@ const Index = ({ darkMode }: IndexProps) => {
     const formData = new FormData();
     formData.append("file", file);
 
+    const token = localStorage.getItem("token");
+
     try {
       const response = await fetch("http://localhost:8000/upload/", {
         method: "POST",
         body: formData,
-        headers: { "ngrok-skip-browser-warning": "true" },
+        headers: { 
+          "ngrok-skip-browser-warning": "true",
+          "Authorization": token ? `Bearer ${token}` : "",
+        },
       });
 
       if (!response.ok) {
@@ -83,6 +96,12 @@ const Index = ({ darkMode }: IndexProps) => {
             fileName: fileName,
             detections: data.detections,
             imageWithDetections: imageWithDetections || undefined,
+            doctorInfo: user ? {
+              name: user.NM_MEDICO,
+              crm: user.NU_CRM,
+              specialty: user.ESPECIALIDADE,
+              uf: user.SG_UF
+            } : undefined
           });
           toast.success("Análise concluída e salva no histórico");
         }
