@@ -1,274 +1,262 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useDropzone } from "react-dropzone";
+
+import { useState, useEffect, useRef } from "react";
+import { Upload, FileImage } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useHistory } from "@/contexts/HistoryContext";
-import { usePatient } from "@/contexts/PatientContext";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  ImageIcon,
-  Plus,
-  Brain,
-  FileImage,
-  UserPlus,
-  AlertTriangle
-} from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
+import html2canvas from "html2canvas";
 
-const Index = ({ darkMode }: { darkMode: boolean }) => {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [patientName, setPatientName] = useState("");
-  const [patientId, setPatientId] = useState("");
-  const [notes, setNotes] = useState("");
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
-  const navigate = useNavigate();
-  const { addHistory } = useHistory();
-  const { addPatient } = usePatient();
-  const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
-  const [newPatientName, setNewPatientName] = useState("");
-  const [newPatientId, setNewPatientId] = useState("");
-  const { user } = useAuth();
+interface IndexProps {
+  darkMode: boolean;
+}
 
-  const { getRootProps, getInputProps } = useDropzone({
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png']
-    },
-    maxFiles: 1,
-    onDrop: (acceptedFiles) => {
-      const file = acceptedFiles[0];
-      setSelectedImage(URL.createObjectURL(file));
-    },
-  });
+const Index = ({ darkMode }: IndexProps) => {
+  const { isAuthenticated, user } = useAuth();
+  const [image, setImage] = useState<string | null>(null);
+  const [detections, setDetections] = useState<any[]>([]);
+  const [fileName, setFileName] = useState("Nenhum arquivo selecionado");
+  const [isLoading, setIsLoading] = useState(false);
+  const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
+  const imageRef = useRef<HTMLImageElement>(null);
+  const detectionsRef = useRef<HTMLDivElement>(null);
+  const { addToHistory } = useHistory();
 
-  const handleClassSelect = (value: string) => {
-    setSelectedClass(value);
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+      
+      // Get original image dimensions before setting the image URL
+      const img = new Image();
+      img.onload = () => {
+        setOriginalImageSize({ width: img.width, height: img.height });
+        URL.revokeObjectURL(img.src); // Clean up
+      };
+      
+      const imageUrl = URL.createObjectURL(file);
+      img.src = imageUrl;
+      setImage(imageUrl);
+      
+      sendImageToBackend(file);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const captureImageWithDetections = async () => {
+    if (!detectionsRef.current) return null;
     
-    if (!selectedImage || !patientName) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
+    try {
+      const canvas = await html2canvas(detectionsRef.current);
+      return canvas.toDataURL('image/png');
+    } catch (error) {
+      console.error("Error capturing image with detections:", error);
+      return null;
+    }
+  };
+
+  const sendImageToBackend = async (file: File) => {
+    setIsLoading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const token = localStorage.getItem("token");
+
+    try {
+      const response = await fetch("http://localhost:8000/upload/", {
+        method: "POST",
+        body: formData,
+        headers: { 
+          "ngrok-skip-browser-warning": "true",
+          "Authorization": token ? `Bearer ${token}` : "",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro na requisição: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setDetections(data.detections);
+      
+      // Wait for detections to render before capturing
+      setTimeout(async () => {
+        // Save to history after successful analysis
+        if (image) {
+          const imageWithDetections = await captureImageWithDetections();
+          
+          addToHistory({
+            imageUrl: image,
+            fileName: fileName,
+            detections: data.detections,
+            imageWithDetections: imageWithDetections || undefined,
+            doctorInfo: user ? {
+              name: user.NM_MEDICO,
+              crm: user.NU_CRM,
+              specialty: user.ESPECIALIDADE,
+              uf: user.SG_UF
+            } : undefined
+          });
+          toast.success("Análise concluída e salva no histórico");
+        }
+        setIsLoading(false);
+      }, 500);
+    } catch (error) {
+      console.error("Erro ao enviar imagem:", error);
+      toast.error("Erro ao processar a imagem. Verifique se o servidor está online.");
+      setIsLoading(false);
+    }
+  };
+
+  // Calculate scale factors based on displayed image size
+  const getScaleFactors = () => {
+    if (!imageRef.current || originalImageSize.width === 0) {
+      return { scaleX: 1, scaleY: 1 };
     }
     
-    // Form processing logic here
-    console.log("Imagem selecionada:", selectedImage);
-    console.log("Nome do paciente:", patientName);
-    console.log("ID do paciente:", patientId);
-    console.log("Anotações:", notes);
-    console.log("Classe selecionada:", selectedClass);
+    const displayedWidth = imageRef.current.clientWidth;
+    const displayedHeight = imageRef.current.clientHeight;
     
-    // Save to history
-    addHistory({
-      imageUrl: selectedImage,
-      patientName: patientName,
-      patientId: patientId,
-      detections: [{
-        x1: 100,
-        y1: 100,
-        x2: 200,
-        y2: 200,
-        label: `Exemplo: ${selectedClass || 'Tumor não classificado'} (100%)`
-      }],
-      notes: notes,
-      doctorInfo: user ? {
-        name: user.NM_MEDICO,
-        crm: user.NU_CRM,
-        uf: user.SG_UF
-      } : undefined
-    });
-    
-    // Reset form
-    setSelectedImage(null);
-    setPatientName("");
-    setPatientId("");
-    setNotes("");
-    setSelectedClass(null);
-    
-    toast.success("Análise adicionada ao histórico!");
-    navigate("/historico");
-  };
-
-  const openNewPatientModal = () => {
-    setIsNewPatientModalOpen(true);
-  };
-
-  const closeNewPatientModal = () => {
-    setIsNewPatientModalOpen(false);
-    setNewPatientName("");
-    setNewPatientId("");
-  };
-
-  const handleCreateNewPatient = () => {
-    if (!newPatientName || !newPatientId) {
-      toast.error("Nome e ID do paciente são obrigatórios");
-      return;
-    }
-
-    addPatient({
-      id: newPatientId,
-      name: newPatientName,
-    });
-
-    toast.success("Paciente adicionado com sucesso!");
-    closeNewPatientModal();
+    return {
+      scaleX: displayedWidth / originalImageSize.width,
+      scaleY: displayedHeight / originalImageSize.height
+    };
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <Card className="w-full max-w-3xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl">Análise Rápida de Imagem</CardTitle>
-          <CardDescription>
-            Selecione uma imagem e insira os detalhes do paciente para iniciar
-            a análise.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Upload de Imagem */}
-            <div {...getRootProps()} className={cn(
-              "border-2 border-dashed rounded-md p-4 text-center cursor-pointer",
-              selectedImage ? "bg-gray-100" : "bg-transparent",
-              darkMode ? "border-gray-700" : "border-gray-300"
-            )}>
-              <input {...getInputProps()} />
-              {selectedImage ? (
-                <img
-                  src={selectedImage}
-                  alt="Imagem selecionada"
-                  className="max-h-48 mx-auto rounded-md"
-                />
-              ) : (
-                <>
-                  <ImageIcon className="mx-auto h-6 w-6 text-gray-400" />
-                  <p className="text-sm text-gray-500">
-                    Arraste e solte a imagem aqui ou clique para selecionar
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* Nome do Paciente */}
-            <div>
-              <Label htmlFor="patientName">Nome do Paciente</Label>
-              <div className="relative">
-                <Input
-                  type="text"
-                  id="patientName"
-                  placeholder="Digite o nome do paciente"
-                  value={patientName}
-                  onChange={(e) => setPatientName(e.target.value)}
-                  required
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={openNewPatientModal}
-                >
-                  <UserPlus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* ID do Paciente */}
-            <div>
-              <Label htmlFor="patientId">ID do Paciente (opcional)</Label>
-              <Input
-                type="text"
-                id="patientId"
-                placeholder="Digite o ID do paciente"
-                value={patientId}
-                onChange={(e) => setPatientId(e.target.value)}
-              />
-            </div>
-
-            {/* Anotações */}
-            <div>
-              <Label htmlFor="notes">Anotações</Label>
-              <Textarea
-                id="notes"
-                placeholder="Adicione anotações sobre a imagem"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-
-            {/* Classificação */}
-            <div>
-              <Label htmlFor="class">Classificação (exemplo)</Label>
-              <Select onValueChange={handleClassSelect}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione uma classe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Glioblastoma">Glioblastoma</SelectItem>
-                  <SelectItem value="Meningioma">Meningioma</SelectItem>
-                  <SelectItem value="Metástase">Metástase</SelectItem>
-                  <SelectItem value="Nenhuma">Nenhuma</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Botão de Envio */}
-            <Button type="submit" className="w-full">
-              Analisar Imagem
-              <Brain className="ml-2 h-4 w-4" />
-            </Button>
-          </form>
+    <div className="w-full max-w-7xl mx-auto">
+      <h1 className="text-xl md:text-3xl font-bold flex items-center gap-2 mb-8">
+        🧑‍⚕️ Análise de Tumores
+      </h1>
+      
+      {/* Área de upload */}
+      <Card className={`mb-6 ${darkMode ? "bg-gray-800" : "bg-white"}`}>
+        <CardContent className="p-6">
+          <div className="flex flex-col items-center gap-4">
+            <h2 className="text-xl font-semibold">Envie uma imagem para análise</h2>
+            
+            <label 
+              className={`cursor-pointer flex items-center gap-2 ${
+                darkMode ? "bg-blue-600" : "bg-blue-500"
+              } text-white px-6 py-3 rounded-lg hover:opacity-90 transition duration-200 shadow-md`}
+            >
+              <Upload className="w-5 h-5" />
+              Escolher Imagem
+              <input type="file" className="hidden" onChange={handleImageUpload} accept="image/*" />
+            </label>
+            
+            <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              {fileName}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Modal para Novo Paciente */}
-      {isNewPatientModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-lg w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Novo Paciente</h2>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="newPatientName">Nome do Paciente</Label>
-                <Input
-                  type="text"
-                  id="newPatientName"
-                  placeholder="Digite o nome do paciente"
-                  value={newPatientName}
-                  onChange={(e) => setNewPatientName(e.target.value)}
+      {/* Área de visualização */}
+      {image && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Imagem original */}
+          <Card className={`${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <CardContent className="p-4">
+              <h2 className="text-lg font-medium mb-3 flex items-center gap-2">
+                <FileImage className="w-5 h-5" />
+                Imagem Original
+              </h2>
+              <Separator className="mb-4" />
+              <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                <img 
+                  src={image} 
+                  alt="Original" 
+                  className="w-full h-auto object-contain"
                 />
               </div>
-              <div>
-                <Label htmlFor="newPatientId">ID do Paciente</Label>
-                <Input
-                  type="text"
-                  id="newPatientId"
-                  placeholder="Digite o ID do paciente"
-                  value={newPatientId}
-                  onChange={(e) => setNewPatientId(e.target.value)}
+            </CardContent>
+          </Card>
+
+          {/* Imagem com detecções */}
+          <Card className={`${darkMode ? "bg-gray-800" : "bg-white"}`}>
+            <CardContent className="p-4">
+              <h2 className="text-lg font-medium mb-3 flex items-center gap-2">
+                <FileImage className="w-5 h-5" />
+                Detecções de Tumores
+              </h2>
+              <Separator className="mb-4" />
+              <div 
+                ref={detectionsRef}
+                className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative"
+              >
+                <img 
+                  ref={imageRef}
+                  src={image} 
+                  alt="Com detecções" 
+                  className="w-full h-auto object-contain"
+                  onLoad={() => {
+                    // Force a re-render so we get accurate image dimensions after loading
+                    setDetections([...detections]);
+                  }}
                 />
+                
+                {isLoading ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                    <div className="text-white text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mx-auto mb-3"></div>
+                      <p>Analisando imagem...</p>
+                    </div>
+                  </div>
+                ) : (
+                  detections.map((box, index) => {
+                    const { scaleX, scaleY } = getScaleFactors();
+                    
+                    return (
+                      <div
+                        key={index}
+                        className="absolute border-4 border-red-500 rounded-lg shadow-md"
+                        style={{
+                          left: `${box.x1 * scaleX}px`,
+                          top: `${box.y1 * scaleY}px`,
+                          width: `${(box.x2 - box.x1) * scaleX}px`,
+                          height: `${(box.y2 - box.y1) * scaleY}px`,
+                        }}
+                      >
+                        <div
+                          className="absolute bg-red-600 text-white text-xs md:text-sm font-semibold px-2 py-1 rounded-lg shadow-md"
+                          style={{
+                            top: "-28px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {box.label}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="ghost" onClick={closeNewPatientModal}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreateNewPatient}>Criar Paciente</Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
+      
+      {/* Instrução inicial */}
+      {!image && (
+        <div className={`text-center p-10 rounded-lg ${darkMode ? "bg-gray-800" : "bg-white"} shadow-md`}>
+          <FileImage className="w-16 h-16 mx-auto mb-4 opacity-30" />
+          <p className="text-xl">Envie uma imagem para iniciar a detecção de tumores</p>
+        </div>
+      )}
+      
+      {/* Footer */}
+      <footer className="mt-auto pt-8 text-center text-sm opacity-70">
+        <p>© 2025 TumorVision Buddy - Ferramenta de auxílio para detecção de tumores</p>
+      </footer>
     </div>
   );
 };

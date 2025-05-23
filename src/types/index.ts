@@ -1,31 +1,35 @@
+
+export interface Paciente {
+    id: string;
+    nome: string;
+    idade: number;
+    sexo: string;
+}
+  
 export interface Detection {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  label: string;
+    label: string;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
 }
 
-export interface Patient {
-  id: string;
+export interface DoctorInfo {
   name: string;
-  birthDate: string;
-  gender: string;
-  examDate: string;
+  crm: string;
+  specialty: string;
+  uf: string;
 }
-
-// Update the AnalysisEntry type to include doctorInfo
+  
 export interface AnalysisEntry {
-  id: string;
-  imageUrl: string;
-  patientId?: string;
-  patientName?: string;
-  timestamp: number;
-  detections: Detection[];
-  notes?: string;
-  doctorInfo?: {
-    name: string;
-    crm: string;
-    uf: string;
-  };
+    id: string;
+    fileName: string;
+    imageUrl: string;
+    imageWithDetections?: string;
+    timestamp: number;
+    detections: Detection[];
+    paciente?: Paciente;
+    patientId: string;
+    patientName?: string;
+    doctorInfo?: DoctorInfo;
 }
