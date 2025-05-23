@@ -20,6 +20,12 @@ export interface AnalysisEntry {
   imageWithDetections?: string; // Property to store image with detections
   patientId?: string; // ID do paciente associado à análise
   patientName?: string; // Nome do paciente para exibição
+  doctorInfo?: {
+    name: string;
+    crm: string;
+    specialty?: string;
+    uf: string;
+  };
 }
 
 interface HistoryContextType {
