@@ -1,14 +1,24 @@
 
 import { useState, useEffect, useRef } from "react";
-import { Upload, FileImage } from "lucide-react";
+import { Upload, FileImage, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useHistory } from "@/contexts/HistoryContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePatient } from "@/contexts/PatientContext";
 import { Navigate } from "react-router-dom";
 import html2canvas from "html2canvas";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface IndexProps {
   darkMode: boolean;
@@ -16,6 +26,7 @@ interface IndexProps {
 
 const Index = ({ darkMode }: IndexProps) => {
   const { isAuthenticated, user } = useAuth();
+  const { currentPatient } = usePatient();
   const [image, setImage] = useState<string | null>(null);
   const [detections, setDetections] = useState<any[]>([]);
   const [fileName, setFileName] = useState("Nenhum arquivo selecionado");
@@ -96,6 +107,8 @@ const Index = ({ darkMode }: IndexProps) => {
             fileName: fileName,
             detections: data.detections,
             imageWithDetections: imageWithDetections || undefined,
+            patientId: currentPatient?.id,
+            patientName: currentPatient?.name,
             doctorInfo: user ? {
               name: user.NM_MEDICO,
               crm: user.NU_CRM,
@@ -140,6 +153,25 @@ const Index = ({ darkMode }: IndexProps) => {
         <CardContent className="p-6">
           <div className="flex flex-col items-center gap-4">
             <h2 className="text-xl font-semibold">Envie uma imagem para análise</h2>
+            
+            {/* Patient selection */}
+            <div className="w-full max-w-xs">
+              <div className="flex items-center mb-2">
+                <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="text-sm font-medium">Paciente selecionado:</span>
+              </div>
+              {currentPatient ? (
+                <div className="p-3 border rounded-md bg-muted/50">
+                  <div className="font-medium">{currentPatient.name}</div>
+                  <div className="text-sm text-muted-foreground">Prontuário: {currentPatient.id}</div>
+                </div>
+              ) : (
+                <div className="text-sm text-yellow-600 bg-yellow-100 p-3 rounded-md flex items-center">
+                  <span className="mr-2">⚠️</span>
+                  <span>Nenhum paciente selecionado. Selecione um paciente na página de pacientes.</span>
+                </div>
+              )}
+            </div>
             
             <label 
               className={`cursor-pointer flex items-center gap-2 ${

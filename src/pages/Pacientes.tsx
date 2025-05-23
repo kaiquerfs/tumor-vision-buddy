@@ -1,7 +1,7 @@
 
-// src/pages/Pacientes.tsx
 import { useState, useEffect } from "react";
-import { Users, PlusCircle, Pencil, Trash2, Brain, FileImage } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Users, PlusCircle, Pencil, Trash2, Brain, FileImage, Check, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -26,9 +26,10 @@ import { useHistory } from "@/contexts/HistoryContext";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { PatientAnalysesList } from "@/components/PatientAnalysesList";
+import { usePatient, Patient } from "@/contexts/PatientContext";
+import { Badge } from "@/components/ui/badge";
 
-interface Paciente {
-  id: string;
+interface PacienteForm {
   nome: string;
   idade: string;
   genero: string;
@@ -36,32 +37,27 @@ interface Paciente {
 }
 
 const Pacientes = () => {
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [novoPaciente, setNovoPaciente] = useState<Omit<Paciente, "id">>({
+  const { patients, addPatient, updatePatient, removePatient, currentPatient, setCurrentPatient } = usePatient();
+  const [novoPaciente, setNovoPaciente] = useState<PacienteForm>({
     nome: "",
     idade: "",
     genero: "",
     prontuario: "",
   });
   const { history } = useHistory();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string>("");
-  const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("pacientes");
 
-  // Carregar pacientes do localStorage quando o componente for montado
   useEffect(() => {
-    const savedPacientes = localStorage.getItem("pacientes");
-    if (savedPacientes) {
-      setPacientes(JSON.parse(savedPacientes));
+    // Set selectedPatientId based on currentPatient when the component mounts
+    if (currentPatient) {
+      setSelectedPatientId(currentPatient.id);
     }
-  }, []);
-
-  // Salvar pacientes no localStorage sempre que houver alteração
-  useEffect(() => {
-    localStorage.setItem("pacientes", JSON.stringify(pacientes));
-  }, [pacientes]);
+  }, [currentPatient]);
 
   const handleAddOrUpdatePaciente = () => {
     // Validação dos campos
@@ -86,47 +82,63 @@ const Pacientes = () => {
       return;
     }
 
-    const pacienteComId = {
-      id: editingId ?? uuidv4(), // Se editando, mantém o ID existente; se criando, gera um novo UUID
-      ...novoPaciente,
+    const id = editingId || uuidv4();
+    const patient: Patient = {
+      id,
+      name: novoPaciente.nome,
+      idade: novoPaciente.idade,
+      gender: novoPaciente.genero,
+      prontuario: novoPaciente.prontuario,
     };
 
-    // Se estiver editando, substitui o paciente com o mesmo ID
-    if (editingId !== null) {
-      setPacientes((prev) =>
-        prev.map((p) => (p.id === editingId ? pacienteComId : p))
-      );
-      toast.success("Paciente atualizado com sucesso");
+    // Se estiver editando, atualiza o paciente, senão adiciona um novo
+    if (editingId) {
+      updatePatient(id, patient);
     } else {
-      setPacientes((prev) => [...prev, pacienteComId]);
-      toast.success("Paciente cadastrado com sucesso");
+      addPatient(patient);
     }
 
     setNovoPaciente({ nome: "", idade: "", genero: "", prontuario: "" });
     setEditingId(null);
     setIsOpen(false);
-    setFormError("");  // Limpar erro ao enviar
+    setFormError("");
   };
 
-  const handleEdit = (paciente: Paciente) => {
+  const handleEdit = (paciente: any) => {
     setNovoPaciente({
-      nome: paciente.nome,
-      idade: paciente.idade,
-      genero: paciente.genero,
-      prontuario: paciente.prontuario,
+      nome: paciente.nome || paciente.name,
+      idade: paciente.idade || "",
+      genero: paciente.genero || paciente.gender || "",
+      prontuario: paciente.prontuario || "",
     });
     setEditingId(paciente.id);
     setIsOpen(true);
   };
 
   const handleRemove = (id: string) => {
-    setPacientes((prev) => prev.filter((p) => p.id !== id));
-    toast.success("Paciente removido com sucesso");
+    removePatient(id);
   };
 
   const viewPatientAnalyses = (patientId: string) => {
-    setSelectedPatient(patientId);
+    setSelectedPatientId(patientId);
     setActiveTab("analises");
+  };
+  
+  const selectPatientForAnalysis = (patient: any) => {
+    const formattedPatient: Patient = {
+      id: patient.id,
+      name: patient.nome || patient.name,
+      idade: patient.idade,
+      gender: patient.genero || patient.gender,
+      prontuario: patient.prontuario
+    };
+    
+    setCurrentPatient(formattedPatient);
+    toast.success(`Paciente ${formattedPatient.name} selecionado para análise`);
+  };
+
+  const goToAnalysisPage = () => {
+    navigate('/analise');
   };
 
   // Contagem de análises por paciente
@@ -134,7 +146,7 @@ const Pacientes = () => {
     return history.filter(analysis => analysis.patientId === patientId).length;
   };
 
-  const selectedPatientName = pacientes.find(p => p.id === selectedPatient)?.nome;
+  const selectedPatientName = patients.find(p => p.id === selectedPatientId)?.name;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -147,6 +159,25 @@ const Pacientes = () => {
         </Button>
       </div>
 
+      {currentPatient && (
+        <Card className="mb-6 bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-medium flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-600" />
+                  Paciente selecionado para análise
+                </h3>
+                <p className="mt-1">{currentPatient.name} {currentPatient.prontuario ? `- Prontuário: ${currentPatient.prontuario}` : ''}</p>
+              </div>
+              <Button onClick={goToAnalysisPage} className="bg-blue-600">
+                Ir para análise <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList className="w-full grid grid-cols-2 mb-4">
           <TabsTrigger value="pacientes" onClick={() => setActiveTab("pacientes")}>
@@ -155,7 +186,7 @@ const Pacientes = () => {
           <TabsTrigger 
             value="analises" 
             onClick={() => setActiveTab("analises")} 
-            disabled={!selectedPatient}
+            disabled={!selectedPatientId}
           >
             <Brain className="h-4 w-4 mr-2" /> Análises do Paciente
           </TabsTrigger>
@@ -176,7 +207,7 @@ const Pacientes = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pacientes.length === 0 ? (
+                  {patients.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         <div className="flex flex-col items-center">
@@ -195,11 +226,19 @@ const Pacientes = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    pacientes.map((paciente) => (
-                      <TableRow key={paciente.id} className="hover:bg-muted/50 cursor-pointer">
-                        <TableCell className="font-medium">{paciente.nome}</TableCell>
+                    patients.map((paciente) => (
+                      <TableRow 
+                        key={paciente.id} 
+                        className={`hover:bg-muted/50 cursor-pointer ${currentPatient?.id === paciente.id ? 'bg-blue-50' : ''}`}
+                      >
+                        <TableCell className="font-medium">
+                          {paciente.name}
+                          {currentPatient?.id === paciente.id && (
+                            <Badge className="ml-2 bg-blue-500">Selecionado</Badge>
+                          )}
+                        </TableCell>
                         <TableCell>{paciente.idade}</TableCell>
-                        <TableCell>{paciente.genero}</TableCell>
+                        <TableCell>{paciente.gender}</TableCell>
                         <TableCell>{paciente.prontuario}</TableCell>
                         <TableCell>
                           <Button 
@@ -212,6 +251,17 @@ const Pacientes = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className={currentPatient?.id === paciente.id ? "bg-blue-100" : ""}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                selectPatientForAnalysis(paciente);
+                              }}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
                             <Button variant="outline" size="sm" onClick={() => handleEdit(paciente)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -234,7 +284,7 @@ const Pacientes = () => {
         </TabsContent>
 
         <TabsContent value="analises">
-          {selectedPatient && (
+          {selectedPatientId && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-medium flex items-center gap-2">
@@ -249,7 +299,7 @@ const Pacientes = () => {
                   Voltar para lista
                 </Button>
               </div>
-              <PatientAnalysesList patientId={selectedPatient} />
+              <PatientAnalysesList patientId={selectedPatientId} />
             </div>
           )}
         </TabsContent>

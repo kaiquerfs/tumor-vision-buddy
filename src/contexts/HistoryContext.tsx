@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { saveToIndexedDB, getAllFromIndexedDB, clearIndexedDB } from "@/utils/indexedDB";
 import { toast } from "sonner";
@@ -20,6 +21,12 @@ export interface AnalysisEntry {
   imageWithDetections?: string; // Property to store image with detections
   patientId?: string; // ID do paciente associado à análise
   patientName?: string; // Nome do paciente para exibição
+  doctorInfo?: {
+    name: string;
+    crm: string;
+    specialty: string;
+    uf: string;
+  };
 }
 
 interface HistoryContextType {
