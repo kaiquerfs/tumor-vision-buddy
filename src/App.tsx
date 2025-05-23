@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
-import Index from "./pages/Index";
 import Analise from "./pages/Analise";
 import Historico from "./pages/Historico";
 import Pacientes from "./pages/Pacientes";
@@ -138,13 +138,7 @@ const App = () => {
               <BrowserRouter>
                 <Routes>
                   <Route path="/login" element={<Login />} />
-                  <Route path="/" element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <Index darkMode={false} />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  } />
+                  <Route path="/" element={<Navigate to="/analise" />} />
                   <Route path="/analise" element={
                     <ProtectedRoute>
                       <MainLayout>

@@ -35,6 +35,10 @@ const UserProfile = () => {
     return null;
   }
 
+  // Process the situation status - show "Regular" as "Ativo"
+  const situationStatus = user.SITUACAO === "Regular" ? "Ativo" : user.SITUACAO;
+  const isActive = situationStatus === "Ativo";
+
   const formatDate = (dateString: string) => {
     try {
       // Parse date from DD/MM/YYYY format
@@ -92,8 +96,8 @@ const UserProfile = () => {
               <p className="text-sm text-muted-foreground">{user.ESPECIALIDADE}</p>
               
               <div className="flex justify-center items-center gap-1 mt-1">
-                <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-200">
-                  {user.SITUACAO}
+                <span className={`bg-${isActive ? 'green' : 'red'}-100 text-${isActive ? 'green' : 'red'}-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-${isActive ? 'green' : 'red'}-900 dark:text-${isActive ? 'green' : 'red'}-200`}>
+                  {situationStatus}
                 </span>
               </div>
             </div>
@@ -182,11 +186,11 @@ const UserProfile = () => {
               
               <StatisticsCard
                 title="Situação do Registro"
-                value={user.SITUACAO === "Ativo" ? "Ativo" : "Inativo"}
+                value={situationStatus}
                 description="Status do seu registro médico"
                 icon={Shield}
                 className="h-full"
-                iconClassName={user.SITUACAO === "Ativo" ? "bg-green-500" : "bg-red-500"}
+                iconClassName={isActive ? "bg-green-500" : "bg-red-500"}
               />
             </div>
             

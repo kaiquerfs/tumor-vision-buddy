@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { 
   Brain, 
   FileImage, 
-  Home, 
   Settings, 
   Users, 
   Menu,
@@ -15,11 +14,6 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
-  { 
-    icon: Home, 
-    name: "Dashboard", 
-    path: "/" 
-  },
   { 
     icon: Brain, 
     name: "Análise de Tumores", 
