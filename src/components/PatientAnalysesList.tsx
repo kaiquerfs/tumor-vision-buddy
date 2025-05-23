@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
-import ViewAnalysisDialog from "./ViewAnalysisDialog";
+import { ViewAnalysisDialog } from "./ViewAnalysisDialog"; // Changed from default to named import
 
 interface PatientAnalysesListProps {
   patientId: string;
@@ -157,7 +157,13 @@ const PatientAnalysesList: React.FC<PatientAnalysesListProps> = ({ patientId }) 
                 </Button>
               </div>
               
-              <ViewAnalysisDialog entry={entry} />
+              <ViewAnalysisDialog 
+                entry={entry}
+                onExportPDF={exportToPDF}
+                onDownloadImage={downloadImage}
+                formatDate={formatDate}
+                formatTime={formatTime}
+              />
             </div>
           </CardContent>
         </Card>

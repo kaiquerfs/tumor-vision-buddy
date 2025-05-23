@@ -1,4 +1,3 @@
-
 // src/pages/Pacientes.tsx
 import { useState, useEffect } from "react";
 import { Users, PlusCircle, Pencil, Trash2, Brain, FileImage } from "lucide-react";
@@ -25,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useHistory } from "@/contexts/HistoryContext";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
-import { PatientAnalysesList } from "@/components/PatientAnalysesList";
+import PatientAnalysesList from "@/components/PatientAnalysesList";
 
 interface Paciente {
   id: string;
