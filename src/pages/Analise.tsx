@@ -1,295 +1,292 @@
-import React, { useState, useRef } from "react";
-import { toast } from "sonner";
-import { fabric } from "fabric";
+
+import { useState, useEffect, useRef } from "react";
+import { FileImage, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 import { useHistory } from "@/contexts/HistoryContext";
-import { usePatient } from "@/contexts/PatientContext";
-import { Listbox, ListboxItem } from "@/components/ui/listbox";
-import { Loader2, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import html2canvas from "html2canvas";
+
+interface Paciente {
+  id: string;
+  nome: string;
+  idade: string;
+  genero: string;
+  prontuario: string;
+}
 
 const Analise = () => {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
-  const [detections, setDetections] = useState<
-    { x1: number; y1: number; x2: number; y2: number; label: string }[]
-  >([]);
-  const [notes, setNotes] = useState("");
+  const [image, setImage] = useState<string | null>(null);
+  const [detections, setDetections] = useState<any[]>([]);
+  const [fileName, setFileName] = useState("Nenhum arquivo selecionado");
   const [isLoading, setIsLoading] = useState(false);
-  const canvasRef = useRef<fabric.Canvas | null>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const { addHistory } = useHistory();
-  const { patients } = usePatient();
-  const [selectedPatient, setSelectedPatient] = useState<{ id: string; name: string } | null>(null);
-
-  // Get user info from auth context
-  const { user } = useAuth();
+  const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
+  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const detectionsRef = useRef<HTMLDivElement>(null);
+  const { addToHistory } = useHistory();
+  const { user, isAuthenticated } = useAuth();
+  
+  // Carregar pacientes do localStorage
+  const pacientes = JSON.parse(localStorage.getItem("pacientes") || "[]");
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageUrl = e.target?.result as string;
-        setSelectedImage(imageUrl);
+      setFileName(file.name);
 
-        // Initialize Fabric.js canvas
-        const canvas = new fabric.Canvas(canvasRef.current, {
-          width: 500,
-          height: 400,
-        });
-        fabric.Image.fromURL(imageUrl, (img) => {
-          img.scaleToWidth(500);
-          img.scaleToHeight(400);
-          canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-            scaleX: canvas.width / img.width,
-            scaleY: canvas.height / img.height,
-          });
-        });
-        canvasRef.current = canvas;
-        setDetections([]);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Image = reader.result as string;
+        setImage(base64Image);
+
+        const img = new Image();
+        img.onload = () => {
+          setOriginalImageSize({ width: img.width, height: img.height });
+        };
+        img.src = base64Image;
+
+        sendImageToBackend(file);
       };
+
       reader.readAsDataURL(file);
     }
   };
 
-  const handleDetect = async () => {
-    if (!selectedImage) {
-      toast.error("Selecione uma imagem primeiro");
+  const captureImageWithDetections = async () => {
+    if (!detectionsRef.current) return null;
+
+    try {
+      const canvas = await html2canvas(detectionsRef.current);
+      return canvas.toDataURL("image/png");
+    } catch (error) {
+      console.error("Error capturing image with detections:", error);
+      return null;
+    }
+  };
+
+  const sendImageToBackend = async (file: File) => {
+    if (!selectedPaciente) {
+      toast.error("Selecione um paciente antes de enviar a imagem.");
+      return;
+    }
+
+    if (!isAuthenticated) {
+      toast.error("Você precisa estar autenticado para realizar análises.");
       return;
     }
 
     setIsLoading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("pacienteId", selectedPaciente.id);
+
+    const token = localStorage.getItem("token");
+
     try {
-      // Simulate tumor detection
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await fetch("http://localhost:8000/upload/", {
+        method: "POST",
+        body: formData,
+        headers: { 
+          "ngrok-skip-browser-warning": "true",
+          "Authorization": token ? `Bearer ${token}` : "",
+        },
+      });
 
-      const newDetection = {
-        x1: Math.floor(Math.random() * 400),
-        y1: Math.floor(Math.random() * 300),
-        x2: Math.floor(Math.random() * 100) + 400,
-        y2: Math.floor(Math.random() * 100) + 300,
-        label: `Tumor: ${selectedClass || "Não especificado"} (${Math.floor(
-          Math.random() * 50 + 50
-        )}%)`,
-      };
-
-      setDetections([newDetection]);
-
-      // Draw rectangle on canvas
-      if (canvasRef.current) {
-        const rect = new fabric.Rect({
-          left: newDetection.x1,
-          top: newDetection.y1,
-          width: newDetection.x2 - newDetection.x1,
-          height: newDetection.y2 - newDetection.y1,
-          fill: "transparent",
-          stroke: "red",
-          strokeWidth: 2,
-        });
-        canvasRef.current.add(rect);
+      if (!response.ok) {
+        throw new Error(`Erro na requisição: ${response.status}`);
       }
 
-      toast.success("Tumores detectados com sucesso!");
+      const data = await response.json();
+      setDetections(data.detections);
     } catch (error) {
-      console.error("Erro ao detectar tumores:", error);
-      toast.error("Erro ao detectar tumores");
-    } finally {
+      console.error("Erro ao enviar imagem:", error);
+      toast.error("Erro ao processar a imagem. Verifique se o servidor está online.");
       setIsLoading(false);
     }
-
-    // Save to history
-    const newAnalysis = {
-      imageUrl: selectedImage,
-      patientId: selectedPatient?.id || undefined,
-      patientName: selectedPatient?.name || "Paciente não selecionado",
-      detections: detections || [],
-      notes: notes,
-      doctorInfo: user ? {
-        name: user.NM_MEDICO,
-        crm: user.NU_CRM,
-        uf: user.SG_UF
-      } : undefined
-    };
-
-    addHistory(newAnalysis);
   };
 
-  const handleClearCanvas = () => {
-    if (canvasRef.current) {
-      canvasRef.current.clear();
-      setSelectedImage(null);
-      setDetections([]);
+  useEffect(() => {
+    if (!detections.length || !image || !selectedPaciente) return;
+  
+    // Primeiro, encerramos o loading
+    setIsLoading(false);
+  
+    const timeout = setTimeout(() => {
+      requestAnimationFrame(async () => {
+        const imageWithDetections = await captureImageWithDetections();
+  
+        if (imageWithDetections) {
+          addToHistory({
+            imageUrl: image,
+            fileName,
+            detections,
+            imageWithDetections,
+            patientId: selectedPaciente.id,
+            patientName: selectedPaciente.nome,
+            doctorInfo: user ? {
+              name: user.NM_MEDICO,
+              crm: user.NU_CRM,
+              specialty: user.ESPECIALIDADE,
+              uf: user.SG_UF
+            } : undefined
+          });
+  
+          toast.success("Análise concluída e salva no histórico");
+        } else {
+          toast.error("Erro ao capturar imagem para histórico");
+        }
+      });
+    }, 200); // Pequeno delay para garantir que o overlay sumiu visualmente
+    return () => clearTimeout(timeout);
+  }, [detections, image, selectedPaciente]);
+
+  const getScaleFactors = () => {
+    if (!imageRef.current || originalImageSize.width === 0) {
+      return { scaleX: 1, scaleY: 1 };
     }
+
+    const displayedWidth = imageRef.current.clientWidth;
+    const displayedHeight = imageRef.current.clientHeight;
+
+    return {
+      scaleX: displayedWidth / originalImageSize.width,
+      scaleY: displayedHeight / originalImageSize.height,
+    };
   };
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Análise de Imagens</h1>
-        <p className="text-muted-foreground">
-          Selecione uma imagem e o tipo de tumor para iniciar a análise.
-        </p>
+    <div className="p-6 max-w-7xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
+        <FileImage className="h-6 w-6" />
+        Análise Detalhada
+      </h1>
+
+      {/* Selecione um paciente */}
+      <div className="mb-6">
+        <label htmlFor="paciente-select" className="block text-sm font-medium mb-2">
+          Selecione um Paciente:
+        </label>
+        <select
+          id="paciente-select"
+          className="w-full border p-2 rounded-md"
+          onChange={(e) => {
+            const pacienteId = e.target.value;
+            const paciente = pacientes.find((p: Paciente) => p.id === pacienteId);
+            setSelectedPaciente(paciente || null);
+          }}
+        >
+          <option value="">Escolha um paciente</option>
+          {pacientes.map((paciente: Paciente) => (
+            <option key={paciente.id} value={paciente.id}>
+              {paciente.nome}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Input Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Entrada de Dados</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="image">Imagem</Label>
-              <Input
-                type="file"
-                id="image"
-                accept="image/*"
-                onChange={handleImageUpload}
-                ref={imageInputRef}
-                className="hidden"
-              />
-              <Button onClick={() => imageInputRef.current?.click()} className="w-full">
-                {selectedImage ? "Trocar Imagem" : "Selecionar Imagem"}
-              </Button>
-              {selectedImage && (
-                <Button variant="destructive" onClick={handleClearCanvas} className="w-full mt-2">
-                  <X className="mr-2 h-4 w-4" />
-                  Remover Imagem
-                </Button>
-              )}
-            </div>
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="flex flex-col items-center gap-4">
+            <h2 className="text-xl font-semibold">Envie uma imagem para análise detalhada</h2>
 
-            <div>
-              <Label htmlFor="patient">Paciente</Label>
-              <Listbox onValueChange={(value) => {
-                const patient = patients.find(p => p.id === value);
-                setSelectedPatient(patient ? { id: patient.id, name: patient.name } : null);
-              }}>
-                <ListboxTrigger className="w-full">
-                  {selectedPatient ? selectedPatient.name : "Selecionar Paciente"}
-                </ListboxTrigger>
-                <ListboxContent>
-                  {patients.map((patient) => (
-                    <ListboxItem key={patient.id} value={patient.id}>
-                      {patient.name}
-                    </ListboxItem>
-                  ))}
-                </ListboxContent>
-              </Listbox>
-            </div>
-
-            <div>
-              <Label htmlFor="tumorType">Tipo de Tumor</Label>
-              <Select onValueChange={setSelectedClass}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione o Tipo de Tumor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Glioma">Glioma</SelectItem>
-                  <SelectItem value="Meningioma">Meningioma</SelectItem>
-                  <SelectItem value="Metástase">Metástase</SelectItem>
-                  <SelectItem value="Pituitário">Pituitário</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="notes">Anotações</Label>
-              <Textarea
-                id="notes"
-                placeholder="Anotações adicionais sobre a análise"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-
-            <Button onClick={handleDetect} disabled={isLoading} className="w-full">
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Detectando...
-                </>
-              ) : (
-                "Detectar Tumores"
-              )}
+            <Button onClick={() => document.getElementById("file-upload")?.click()}>
+              <Upload className="mr-2 h-4 w-4" />
+              Escolher Imagem
             </Button>
-          </CardContent>
-        </Card>
+            <input
+              id="file-upload"
+              type="file"
+              className="hidden"
+              onChange={handleImageUpload}
+              accept="image/*"
+            />
 
-        {/* Canvas Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Visualização</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <canvas ref={canvasRef} />
-            {detections.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-medium">Deteções:</h3>
-                <ul>
-                  {detections.map((detection, index) => (
-                    <li key={index} className="text-sm">
-                      {detection.label} (x1: {detection.x1}, y1: {detection.y1}, x2: {detection.x2}, y2:{" "}
-                      {detection.y2})
-                    </li>
-                  ))}
-                </ul>
+            <p className="text-sm text-muted-foreground">{fileName}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {image && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardContent className="p-4">
+              <h2 className="text-lg font-medium mb-3">Imagem Original</h2>
+              <Separator className="mb-4" />
+              <div className="rounded-lg overflow-hidden border">
+                <img src={image} alt="Original" className="w-full h-auto object-contain" />
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <h2 className="text-lg font-medium mb-3">Detecções e Diagnóstico</h2>
+              <Separator className="mb-4" />
+              <div
+                ref={detectionsRef}
+                className="rounded-lg overflow-hidden border relative"
+              >
+                <img
+                  ref={imageRef}
+                  src={image}
+                  alt="Com detecções"
+                  className="w-full h-auto object-contain"
+                />
+
+                {isLoading ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                    <div className="text-white text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mx-auto mb-3"></div>
+                      <p>Analisando imagem...</p>
+                    </div>
+                  </div>
+                ) : (
+                  detections.map((box, index) => {
+                    const { scaleX, scaleY } = getScaleFactors();
+
+                    return (
+                      <div
+                        key={index}
+                        className="absolute border-4 border-red-500 rounded-lg shadow-md"
+                        style={{
+                          left: `${box.x1 * scaleX}px`,
+                          top: `${box.y1 * scaleY}px`,
+                          width: `${(box.x2 - box.x1) * scaleX}px`,
+                          height: `${(box.y2 - box.y1) * scaleY}px`,
+                        }}
+                      >
+                        <div
+                          className="absolute bg-red-600 text-white text-xs md:text-sm font-semibold px-2 py-1 rounded-lg shadow-md"
+                          style={{
+                            top: "-28px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {box.label}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {!image && (
+        <div className="text-center p-10 rounded-lg bg-muted shadow-sm">
+          <FileImage className="w-16 h-16 mx-auto mb-4 opacity-30" />
+          <p className="text-xl">Envie uma imagem para iniciar a análise detalhada</p>
+        </div>
+      )}
     </div>
   );
 };
 
 export default Analise;
-
-// Custom trigger and content components for Listbox
-interface ListboxTriggerProps extends React.HTMLAttributes<HTMLButtonElement> {
-  children: React.ReactNode;
-}
-
-const ListboxTrigger = React.forwardRef<HTMLButtonElement, ListboxTriggerProps>(
-  ({ className, children, ...props }, ref) => {
-    return (
-      <Button
-        variant="outline"
-        role="listbox"
-        ref={ref}
-        className={`w-full justify-between text-sm ${className}`}
-        {...props}
-      >
-        {children}
-      </Button>
-    );
-  }
-);
-ListboxTrigger.displayName = "ListboxTrigger";
-
-interface ListboxContentProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
-}
-
-const ListboxContent = React.forwardRef<HTMLDivElement, ListboxContentProps>(
-  ({ className, children, ...props }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={`mt-1 rounded-md border bg-popover text-popover-foreground shadow-md outline-none data-[side=bottom]:animate-slide-in-from-top data-[side=left]:animate-slide-in-from-right data-[side=right]:animate-slide-in-from-left data-[side=top]:animate-slide-in-from-bottom ${className}`}
-        {...props}
-      >
-        <Listbox>
-          <ul className="py-1">{children}</ul>
-        </Listbox>
-      </div>
-    );
-  }
-);
-ListboxContent.displayName = "ListboxContent";
