@@ -93,7 +93,7 @@ const UserProfile = () => {
             
             <div className="text-center space-y-1">
               <h2 className="text-xl font-bold">{user.NM_MEDICO}</h2>
-              <p className="text-sm text-muted-foreground">{user.ESPECIALIDADE}</p>
+              <p className="text-sm text-muted-foreground">{user.ESPECIALIDADE.split("&").map(espec => espec.trim()).filter(espec => espec.includes("RQE Nº")) .join(", ")}</p>
               
               <div className="flex justify-center items-center gap-1 mt-1">
                 <span className={`bg-${isActive ? 'green' : 'red'}-100 text-${isActive ? 'green' : 'red'}-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-${isActive ? 'green' : 'red'}-900 dark:text-${isActive ? 'green' : 'red'}-200`}>
@@ -135,7 +135,7 @@ const UserProfile = () => {
                 <Award className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Especialidade</p>
-                  <p className="text-sm text-muted-foreground">{user.ESPECIALIDADE}</p>
+                  <p className="text-sm text-muted-foreground">{user.ESPECIALIDADE.split("&").map(espec => espec.trim()).filter(espec => espec.includes("RQE Nº")) .join(", ")}</p>
                 </div>
               </div>
             </div>

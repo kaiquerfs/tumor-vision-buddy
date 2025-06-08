@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   BarChart3, 
@@ -6,13 +5,11 @@ import {
   Calendar, 
   Users, 
   Brain,
-  ChartBarIcon,
   TrendingUp
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHistory } from "@/contexts/HistoryContext";
 import { format, parseISO, subDays } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { 
   BarChart, 
   Bar, 
@@ -22,9 +19,6 @@ import {
   Tooltip, 
   Legend, 
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
   LineChart,
   Line
 } from "recharts";
@@ -45,28 +39,36 @@ const Estatisticas = () => {
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
-    // Simulate loading statistics
     const timer = setTimeout(() => {
       setLoadingStats(false);
     }, 500);
-    
     return () => clearTimeout(timer);
   }, []);
 
-  // Compute total metrics
   const totalAnalyses = history.length;
   const totalPatients = new Set(history.filter(item => item.patientId).map(item => item.patientId)).size;
   const totalDetections = history.reduce((acc, item) => acc + item.detections.length, 0);
-  
-  // Calculate average detections per image
+
   const avgDetectionsPerImage = totalAnalyses > 0 
     ? (totalDetections / totalAnalyses).toFixed(1) 
     : '0';
 
-  // Get detection types and counts
+  // Get detection types and counts (with name cleanup)
   const detectionCounts = history.reduce((acc, analysis) => {
     analysis.detections.forEach(detection => {
-      const label = detection.label;
+      const rawLabel = detection.label;
+
+      // Clean label: remove "Tumor X:" and "(86.68%)"
+      let label = rawLabel
+        .replace(/Tumor \d+:\s*/i, '')      // Remove "Tumor 1:"
+        .replace(/\(\d+(\.\d+)?%\)/g, '')   // Remove "(xx.xx%)"
+        .trim();
+
+      // Optional normalization
+      if (label.toLowerCase() === 'tumor não classificado') {
+        label = 'Não classificado';
+      }
+
       acc[label] = (acc[label] || 0) + 1;
     });
     return acc;
@@ -76,7 +78,6 @@ const Estatisticas = () => {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  // Create timeline data for last 30 days
   const last30Days = Array.from({ length: 30 }, (_, i) => {
     const date = subDays(new Date(), 29 - i);
     return {
@@ -85,7 +86,6 @@ const Estatisticas = () => {
     };
   });
 
-  // Populate timeline data
   history.forEach(entry => {
     const date = format(new Date(entry.timestamp), 'yyyy-MM-dd');
     const dayIndex = last30Days.findIndex(day => day.date === date);
@@ -93,8 +93,7 @@ const Estatisticas = () => {
       last30Days[dayIndex].analyses += 1;
     }
   });
-  
-  // Format timeline data for display
+
   const timelineData = last30Days.map(day => ({
     date: format(parseISO(day.date), 'dd/MM'),
     analyses: day.analyses
@@ -108,8 +107,7 @@ const Estatisticas = () => {
       </div>
     );
   }
-  
-  // If there's no data, show empty state
+
   if (history.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] p-6">
